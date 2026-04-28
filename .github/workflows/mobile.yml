@@ -26,8 +26,8 @@ jobs:
       - name: Run scaffold check
         run: npm run lint
 
-  android-debug:
-    name: Android debug APK
+  android-apk:
+    name: Android installable APK
     runs-on: ubuntu-latest
     needs: scaffold
     steps:
@@ -51,16 +51,42 @@ jobs:
       - name: Generate Android project
         run: npm run prebuild:android
 
-      - name: Build Android debug APK
+      - name: Allow test release APK to use debug signing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/build.gradle')
+          s = p.read_text()
+          s = s.replace('signingConfig signingConfigs.release', 'signingConfig signingConfigs.debug')
+          s = s.replace('signingConfig = signingConfigs.release', 'signingConfig = signingConfigs.debug')
+          p.write_text(s)
+          PY
+
+      - name: Build Android installable APK
         run: |
           cd android
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
-      - name: Upload Android debug APK
+      - name: Prepare APK artifact
+        run: |
+          mkdir -p release
+          SRC=$(find android/app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
+          if [ -z "$SRC" ]; then
+            echo "No release APK found"
+            find android/app/build/outputs -type f -print || true
+            exit 1
+          fi
+          cp "$SRC" release/LegacyCoin-Mobile-Wallet-android-installable.apk
+          sha256sum release/LegacyCoin-Mobile-Wallet-android-installable.apk > release/LegacyCoin-Mobile-Wallet-android-installable.apk.sha256.txt
+          ls -la release
+
+      - name: Upload Android installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: LegacyCoin-Mobile-Wallet-android-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: LegacyCoin-Mobile-Wallet-android-installable-apk
+          path: |
+            release/*.apk
+            release/*sha256.txt
           if-no-files-found: error
 
   ios-simulator:
