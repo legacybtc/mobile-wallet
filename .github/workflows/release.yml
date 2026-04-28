@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version like 0.1.8
+        required: true
+        default: 0.1.8
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  android-apk:
+    name: Build and publish Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Android project
+        run: npm run prebuild:android
+
+      - name: Build Android debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Prepare release files
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          mkdir -p release
+          SRC=$(find android/app/build/outputs/apk/debug -type f -name '*.apk' | head -n 1)
+          if [ -z "$SRC" ]; then
+            echo "No APK found"
+            find android/app/build/outputs -type f -print || true
+            exit 1
+          fi
+          DEST="release/LegacyCoin-Mobile-Wallet-${VERSION}-android-debug.apk"
+          cp "$SRC" "$DEST"
+          sha256sum "$DEST" > "release/LegacyCoin-Mobile-Wallet-${VERSION}-android-debug.apk.sha256.txt"
+          ls -la release
+
+      - name: Upload APK workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LegacyCoin-Mobile-Wallet-${{ steps.version.outputs.value }}-android-debug-apk
+          path: |
+            release/*.apk
+            release/*sha256.txt
+          if-no-files-found: error
+
+      - name: Publish APK to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: LegacyCoin Mobile Wallet v${{ steps.version.outputs.value }}
+          body: |
+            LegacyCoin Mobile Wallet v${{ steps.version.outputs.value }}
+
+            Android debug APK for testing.
+
+            Current mobile features:
+            - Wallet dashboard
+            - Receive screen
+            - Send placeholder
+            - Configurable LegacyCoin API endpoint
+            - Balance / immature / height refresh from API
+            - Recent transactions from API
+
+            API endpoints expected by this build:
+            - GET /health
+            - GET /address/:address/balance
+            - GET /address/:address/transactions
+
+            Note: this is a debug APK for testing, not a Play Store signed release.
+          files: |
+            release/*.apk
+            release/*sha256.txt
