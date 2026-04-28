@@ -1,0 +1,90 @@
+name: Mobile
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  scaffold:
+    name: Scaffold checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run scaffold check
+        run: npm run lint
+
+  android-debug:
+    name: Android debug APK
+    runs-on: ubuntu-latest
+    needs: scaffold
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Android project
+        run: npm run prebuild:android
+
+      - name: Build Android debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Upload Android debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LegacyCoin-Mobile-Wallet-android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  ios-simulator:
+    name: iOS simulator project check
+    runs-on: macos-latest
+    needs: scaffold
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate iOS project
+        run: npm run prebuild:ios
+
+      - name: Upload iOS project artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LegacyCoin-Mobile-Wallet-ios-project
+          path: ios
+          if-no-files-found: error
