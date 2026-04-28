@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "LegacyCoin Mobile Wallet",
+    "slug": "legacycoin-mobile-wallet",
+    "version": "0.1.8",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.legacycoin.mobilewallet"
+    },
+    "android": {
+      "package": "org.legacycoin.mobilewallet",
+      "versionCode": 18,
+      "adaptiveIcon": {
+        "backgroundColor": "#05070b"
+      }
+    },
+    "extra": {
+      "legacycoinApiUrl": "https://api.legacybtc.example"
+    }
+  }
+}
